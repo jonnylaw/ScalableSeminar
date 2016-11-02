@@ -2,17 +2,18 @@
 title: "Scalable Bayesian Inference for Streaming Data"
 author: "Jonathan Law"
 date: "2 November 2016"
+autosize: true
 output: 
   ioslides_presentation:
     css: my_presentation.css
-    logo: 6109.pdf
-    self_contained: true
+    highlight: zenburn
+    logo: Figures/6109.pdf
 runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
 packages <- c("dplyr", "tidyr", "ggplot2", "gridExtra", "magrittr", "shiny",
-               "scales", "ggfortify", "RPostgreSQL", "leaflet", "readr")
+               "scales", "ggfortify", "leaflet", "readr")
 newPackages <- packages[!(packages %in% as.character(installed.packages()[,"Package"]))]
 if(length(newPackages)) install.packages(newPackages)
 lapply(packages,require,character.only=T)
@@ -20,15 +21,18 @@ lapply(packages,require,character.only=T)
 theme_set(theme_minimal())
 
 ## Connect to the urban observatory database
-my_db = src_postgres(dbname = "uodata_2", host = "uodata1", port = "5432", user = "uo_select")
+# my_db = src_postgres(dbname = "uodata_2", host = "uodata1", port = "5432", user = "uo_select")
 ```
 
 ## Urban Observatory Air Quality Data
 
 ```{r map, echo=FALSE}
 ## Get the sensor locations
-query = paste0(readLines("Scripts/GetSensorLocations.SQL"), collapse = " ")
-locations = tbl(my_db, sql(query)) %>% collect()
+# query = paste0(readLines("Scripts/GetSensorLocations.SQL"), collapse = " ")
+# locations = tbl(my_db, sql(query)) %>% collect()
+write.csv(locations, file = "locations.csv", row.names = FALSE)
+
+locations = read_csv("locations.csv")
 
 ## Output a leaflet map of sensor locations
 ## Remove misspecified sensor locations (with lat & lon = 0.0)
@@ -48,8 +52,11 @@ name = "new_new_emote_1102"
 startDate = Sys.Date() - 2
 endDate = Sys.Date()
 
-data = tbl(my_db, sql("SELECT * FROM sensor_data_formatted")) %>%
-  filter(sensor_name == name & timestamp >= startDate & timestamp <= endDate & reading %in% readings)
+tbl(my_db, sql("SELECT * FROM sensor_data_formatted")) %>%
+  filter(sensor_name == name & timestamp >= startDate & timestamp <= endDate & reading %in% readings) %>%
+  write.csv("sensor_data.csv", row.names = FALSE)
+
+data = read_csv("sensor_data.csv")
 
 # Plot the readings
 data %>%
@@ -147,7 +154,7 @@ y(t_i)|\eta(t_i) &\sim \pi(y(t_i) | \eta(t_i)), \\
 
 ## POMP Model | Representation of a POMP model as a directed acyclic graph (DAG)
 
-![Single-Dag](SingleDag)
+![POMP](Figures/single-model.pdf)
 
 ## The State Space | Diffusion Process Plot, Generalised Brownian Motion
 
@@ -242,7 +249,7 @@ N(t) &\sim \textrm{Poisson}(N(t) | \lambda(t)) \\
 \textrm{d}X(t) &= \mu \textrm{d}t + \sigma \textrm{d}W(t)
 \end{align*}$$
 
-```{r poissonPlot, echo=FALSE, message=FALSE, fig.width=5, fig.height=3}
+```{r poissonPlot, echo=FALSE, message=FALSE, fig.width=5, fig.height=3, fig.align="center"}
 ## system("cd ~/Desktop/ComposableModels && sbt \"run-main com.github.jonnylaw.examples.SimulatePoisson\"")
 poisson = read_csv("~/Desktop/ComposableModels/PoissonSims.csv", col_names = c("Time", "Observation", "Eta", "Gamma", "State"))
 
