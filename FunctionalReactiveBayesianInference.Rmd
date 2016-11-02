@@ -11,7 +11,6 @@ runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
-# setwd("~/Documents/Study/PhD/scalable-bayesian-modelling-of-uo-data/Presentation/ScalableSeminar/")
 packages <- c("dplyr", "tidyr", "ggplot2", "gridExtra", "magrittr", "shiny",
                "scales", "ggfortify", "RPostgreSQL", "leaflet", "readr")
 newPackages <- packages[!(packages %in% as.character(installed.packages()[,"Package"]))]
@@ -120,9 +119,6 @@ lightbulb_data %>%
 * With irregularly observed data, we can accurately answer questions like: "at 12pm on Tuesday, how many lights were on in The Core?"
 
 ```{r, echo=FALSE, fig.width=5, fig.height=3}
-# lightbulb_data %>%
-#   filter(t >= as.POSIXct("2016-09-01 02:40:00"))
-  
 irregular_light_data = data_frame(t = c(as.POSIXct("2016-09-01"), as.POSIXct("2016-09-01 02:48:35")), y = c(TRUE, FALSE))
 
 lightbulb_data %>%
@@ -238,26 +234,6 @@ shinyApp(
 )
 ```
 
-<!-- ## Example POMP Model | A Poisson model -->
-
-<!-- $$\begin{align*} -->
-<!-- N(t) &\sim \textrm{Poisson}(\lambda(t)) \\ -->
-<!-- \lambda(t_i) &= \exp\{ x(t) \} \\ -->
-<!-- \textrm{d}X(t) &= \mu \textrm{d}t + \sigma \textrm{d}W(t) -->
-<!-- \end{align*}$$ -->
-
-<!-- ```scala -->
-<!-- val p: Parameters = LeafParameter( -->
-<!--     GaussianParameter(6.0, 1.0), -->
-<!--     None, -->
-<!--     OrnsteinParameter(mu = 1.0, sigma = 1.0) -->
-<!-- ) -->
-<!-- val times: List[Time] = // some times -->
-<!-- val mod: UnparamModel = PoissonModel(stepBrownian) -->
-
-<!-- simData(times, mod(p)) take 100 -->
-<!-- ``` -->
-
 ## Example POMP Model | A Poisson Model
 
 $$\begin{align*}
@@ -308,28 +284,6 @@ y(t) &\sim \mathcal{N}(y(t) | \mu(t), \sigma) \\
 \end{align*}$$
 
 * $F_t^T$ is a time dependent vector of fourier components representing seasonality
-
-<!-- ## Example | A Seasonal-Poisson Model -->
-
-<!-- * Now combine the Poisson model and the seasonal model: -->
-
-<!-- $$\begin{align*} -->
-<!-- N(t) &\sim \textrm{Poisson}(N(t) | \lambda(t)) \\ -->
-<!-- \lambda(t_i) &= \exp\{ F_t^T x(t) \} \\ -->
-<!-- \textbf{X}(t_i)|\textbf{x}(t_{i-1}) &\sim \begin{pmatrix}  -->
-<!--     p_1(\textbf{x}^{(1)}(t_i) | \textbf{x}^{(1)}(t_{i-1})) \\ -->
-<!--     p_2(\textbf{x}^{(2)}(t_i) | \textbf{x}^{(2)}(t_{i-1})) -->
-<!-- \end{pmatrix} -->
-<!-- \end{align*}$$ -->
-
-<!-- ```scala -->
-<!-- val poissonParams: Parameters = // Some Parameters -->
-<!-- val seasonalParams: Parameters = // Some parameters -->
-
-<!-- val params = poissonParams |+| seasonalParams -->
-<!-- val unparamModel = PoissonModel(stepBrownian) |+| SeasonalModel(24, 3, stepOrnstein) -->
-<!-- val model = unparamModel(params) -->
-<!-- ``` -->
 
 ## Composed Pomp Example | A Seasonal-Poisson Model
 
@@ -442,18 +396,17 @@ Source.unfold(x0)(a => Some((Gaussian(a, sigma).draw, a)))
 
 * The solid line represents the simulated state, the points represent the particle cloud with the opacity representing each particles likelihood
 
-![](animatedParticleFilter.gif)
+```{r animatedParticleFilter, echo=FALSE}
+knitr::read_chunk("Scripts/AnimateParticleFilter.R")
+```
 
-## Bayesian Inference With Stream
+## Bayesian Inference With Streams
 
 * In order to perform the bootstrap particle filter, we need to know the time of the previous observation and the previous particle cloud
 
-* First define the observation datatype:
+* First define the observation datatype and the state of the bootstrap particle filter
 ```scala
 case class Data(time: Datetime, observation: Double)
-```
-* Define the state of the bootstrap particle filter
-```scala
 case class FilterState(t0: Datetime, state: List[State])
 ```
 * The signature of the filtering step function is: 
@@ -462,9 +415,7 @@ val filterStep: (Data, FilterState) => FilterState
 ```
 * The the filter can by ran using an akka `Flow` and the `scan` operation, the initial state `init` contains the particle cloud and the time at the start of the application of the filter
 ```scala
-def filter(init: FilterState): Flow[Data, FilterState] = {
-  Flow[Data].scan(init)(filterStep)
-}
+def filter(init: FilterState) = Flow[Data].scan(init)(filterStep)
 ```
 
 ## Application of Bootstrap Filter
