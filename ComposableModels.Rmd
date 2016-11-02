@@ -1,0 +1,31 @@
+---
+title: "Scalable Stream Processing and Analysis using Composable POMP Models"
+author: "Jonathan Law"
+date: "28 August 2016"
+output: 
+  beamer_presentation:
+    toc: true
+    highlight: zenburn
+    fonttheme: serif
+---
+
+```{r setup, include=FALSE}
+packages <- c("dplyr", "tidyr", "ggplot2", "gridExtra", "magrittr", "ggmcmc", "coda", "dlm", "readr", "latex2exp", "extrafont", "scales", "ggfortify")
+newPackages <- packages[!(packages %in% as.character(installed.packages()[,"Package"]))]
+if(length(newPackages)) install.packages(newPackages)
+lapply(packages,require,character.only=T)
+
+theme_set(theme_minimal())
+```
+
+# Motivation for models
+
+- Lots of hetergeneous data
+- Want to forecast, interpolate many data sources
+
+# Motivation for Stream Processing
+
+- Lots of data
+- Lots of simulations
+- Online-verification of models
+

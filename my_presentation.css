@@ -1,0 +1,21 @@
+slides > slide {
+  font-family: 'CM Sans', Arial, sans-serif;
+  font-size: 25px;
+  color: #797979;
+}
+.gdbar img {
+  width: 300px !important;
+  height: 100px !important;
+  margin: 8px 8px;
+}
+
+.gdbar {
+  width: 400px !important;
+  height: 120px !important;
+}
+
+slides > slide:not(.nobackground):before {
+  width:  150px;
+  height: 40px;
+  background-size: 150px 40px;
+}
