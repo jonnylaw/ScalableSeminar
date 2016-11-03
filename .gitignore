@@ -1,4 +1,5 @@
 .Rhistory
 *_cache*
+*_files*
 *.aux
 *.log

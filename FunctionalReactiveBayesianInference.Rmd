@@ -5,10 +5,8 @@ date: "2 November 2016"
 autosize: true
 output: 
   ioslides_presentation:
+    logo: Figures/NewcastleLogo.svg
     css: my_presentation.css
-    highlight: zenburn
-    logo: Figures/6109.pdf
-runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
@@ -26,7 +24,7 @@ theme_set(theme_minimal())
 
 ## Urban Observatory Air Quality Data
 
-```{r map, echo=FALSE, message=FALSE}
+```{r map, echo=FALSE, message=FALSE, fig.align='center'}
 ## Get the sensor locations
 # query = paste0(readLines("Scripts/GetSensorLocations.SQL"), collapse = " ")
 # locations = tbl(my_db, sql(query)) %>% collect()
@@ -36,16 +34,14 @@ locations = read_csv("locations.csv")
 
 ## Output a leaflet map of sensor locations
 ## Remove misspecified sensor locations (with lat & lon = 0.0)
-renderLeaflet({
-  leaflet(locations %>% filter(latitude != 0.0)) %>%
-    addTiles() %>%
-    addMarkers(~longitude, ~latitude, popup = ~ paste(name, reading, sep = "\n"))
-})
+leaflet(locations %>% filter(latitude != 0.0)) %>%
+  addTiles() %>%
+  addMarkers(~longitude, ~latitude, popup = ~ paste(name, reading, sep = "\n"))
 ```
 
 ## Urban Observatory Readings
 
-```{r ts_plot, cache=TRUE, echo=FALSE, message=FALSE}
+```{r ts_plot, cache=TRUE, echo=FALSE, message=FALSE, fig.align="center"}
 # Set parameters for data
 readings = c("Temperature", "NO2", "CO", "NO", "Humidity")
 name = "new_new_emote_1102"
@@ -102,14 +98,14 @@ $$y(t_0), y(t_1), \dots $$
 
 * The lightbulb can be considered either on, or off, here is a regularly observed series of the lightbulb
 
-```{r lightbulb, echo=FALSE, fig.width=5, fig.height=3}
+```{r lightbulb, echo=FALSE, fig.width=5, fig.height=3, fig.align="center"}
 set.seed(123453631)
 lightbulb_data = data_frame(t = seq(as.POSIXct("2016-09-01"), as.POSIXct("2016-09-01 12:00"), length.out = 12*12), 
            y = cumsum(rnorm(12*12, 0.5, 1.0)) < 2.0) 
 
 lightbulb_data %>%
   ggplot(aes(x = t, y = y)) + 
-    geom_step() + geom_point() + theme_bw() +
+    geom_step() + geom_point(size = 0.5) + theme_bw() +
     xlab("Time Of Day") +
     ylab("Lightbulb On") +
     scale_x_datetime(labels = date_format("%H:%M"))
@@ -125,7 +121,7 @@ lightbulb_data %>%
 
 * With irregularly observed data, we can accurately answer questions like: "at 12pm on Tuesday, how many lights were on in The Core?"
 
-```{r, echo=FALSE, fig.width=5, fig.height=3}
+```{r, echo=FALSE, fig.width=5, fig.height=3, fig.align="center"}
 irregular_light_data = data_frame(t = c(as.POSIXct("2016-09-01"), as.POSIXct("2016-09-01 02:48:35")), y = c(TRUE, FALSE))
 
 lightbulb_data %>%
@@ -154,11 +150,11 @@ y(t_i)|\eta(t_i) &\sim \pi(y(t_i) | \eta(t_i)), \\
 
 ## POMP Model | Representation of a POMP model as a directed acyclic graph (DAG)
 
-![POMP](Figures/single-model.pdf)
+<div align="center">![POMP](Figures/single-model.svg)</div>
 
 ## The State Space | Diffusion Process Plot, Generalised Brownian Motion
 
-```{r sde, echo=FALSE, message=FALSE}
+```{r sde, echo=FALSE, message=FALSE, eval=FALSE}
 shinyApp(
   ui = fluidPage(
     sidebarLayout(
@@ -199,9 +195,34 @@ shinyApp(
 )
 ```
 
+```{r, echo=FALSE, fig.align='center'}
+brownian_sims = function(mu, sigma) {
+  x = numeric(100)
+  x[1] = rnorm(1, 0, 1)
+  for (i in 2:100) {
+    x[i] = rnorm(1, mean = x[i-1] + mu, sd = sigma)
+  }
+  data_frame(Time = 1:100, Value = x) %>%
+    mutate(upper = qnorm(p = 0.975, mean = Value, sd = sigma), 
+           lower = qnorm(p = 0.025, mean = Value, sd = sigma))
+}
+
+brownianSims = bind_rows(cbind(drift = rep(0.0, 100), brownian_sims(0.0, 0.5)),
+          cbind(drift = rep(0.1, 100), brownian_sims(0.1, 0.5)),
+          cbind(drift = rep(-0.1, 100), brownian_sims(-0.1, 0.5)),
+          cbind(drift = rep(0.5, 100), brownian_sims(0.5, 0.5)))
+
+brownianSims %>%
+  ggplot(aes(x = Time, y = Value)) + 
+  geom_line() +
+  geom_ribbon(aes(ymax = upper, ymin = lower), alpha = 0.3) +
+  ggtitle("Generalised Brownian Motion Simulation With Different Drift Values") + 
+  facet_wrap(~drift, scales = "free_y")
+```
+
 ## The State Space | Diffusion Process Plot, Ornstein-Uhlenbeck Process
 
-```{r OU, echo=FALSE}
+```{r OU, echo=FALSE, eval=FALSE}
 shinyApp(
   ui = fluidPage(
     sidebarLayout(
@@ -241,6 +262,35 @@ shinyApp(
 )
 ```
 
+```{r OU sims, echo=FALSE, fig.align="center"}
+ ou_sims = function(theta, alpha, sigma) {
+  x = numeric(100)
+  x[1] = rnorm(1, 0, 1)
+  for (i in 2:100) {
+    mean = theta + (x[i-1] - theta) * exp(- alpha)
+    variance = (sigma**2/2*alpha)*(1-exp(-2*alpha))
+    x[i] = rnorm(1, mean, sqrt(variance))
+  }
+
+  data_frame(Time = 1:100, Value = x)  %>%
+     mutate(upper = qnorm(0.975, mean = Value, sd = sigma), 
+            lower = qnorm(0.025, mean = Value, sd = sigma))
+}
+
+ouSims = bind_rows(cbind(alpha = rep(0.05, 100), ou_sims(3.0, 0.05, 0.1)),
+                   cbind(alpha = rep(0.1, 100), ou_sims(3.0, 0.1, 0.1)),
+                   cbind(alpha = rep(0.2, 100), ou_sims(3.0, 0.2, 0.1)),
+                   cbind(alpha = rep(0.5, 100), ou_sims(3.0, 0.5, 0.1)))
+
+ouSims %>%
+  ggplot(aes(x = Time, y = Value)) + 
+  geom_line() +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.3) +
+  ggtitle("Ornstein-Uhlenbeck Process Simulation with Varying Values of Alpha") + 
+  facet_wrap(~alpha)
+```
+
+
 ## Example POMP Model | A Poisson Model
 
 $$\begin{align*}
@@ -251,7 +301,7 @@ N(t) &\sim \textrm{Poisson}(N(t) | \lambda(t)) \\
 
 ```{r poissonPlot, echo=FALSE, message=FALSE, fig.width=5, fig.height=3, fig.align="center"}
 ## system("cd ~/Desktop/ComposableModels && sbt \"run-main com.github.jonnylaw.examples.SimulatePoisson\"")
-poisson = read_csv("~/Desktop/ComposableModels/PoissonSims.csv", col_names = c("Time", "Observation", "Eta", "Gamma", "State"))
+poisson = read_csv("PoissonSims.csv", col_names = c("Time", "Observation", "Eta", "Gamma", "State"))
 
 type = c("Observation", "Eta", "State")
 
@@ -282,7 +332,7 @@ poisson %>%
 
 ## Composed POMP Example | A Seasonal Poisson Model
 
-* First define a simple seasonal model, with an Ornstein-Uhlenbeck state space
+* First define a seasonal model, with an Ornstein-Uhlenbeck state space
 
 $$\begin{align*}
 y(t) &\sim \mathcal{N}(y(t) | \mu(t), \sigma) \\
@@ -290,7 +340,26 @@ y(t) &\sim \mathcal{N}(y(t) | \mu(t), \sigma) \\
 \textrm{d}\textbf{X}(t) &= \alpha(\theta - \textbf{x}(t)) \textrm{d}t + \Sigma \textrm{d}W(t)
 \end{align*}$$
 
-* $F_t^T$ is a time dependent vector of fourier components representing seasonality
+* $F_t^T$ is a time dependent vector of fourier components representing seasonality:
+
+$$F_t = \begin{pmatrix}
+\cos(\omega t) \\
+\sin(\omega t) \\
+\cos(2\omega t) \\
+\sin(2\omega t) \\
+\cos(3\omega t) \\
+\sin(3\omega t)
+\end{pmatrix}$$
+
+## Composed POMP Example
+
+* Define a Poisson model as previously:
+
+$$\begin{align*}
+N(t) &\sim \textrm{Poisson}(N(t) | \lambda(t)) \\
+\lambda(t_i) &= \exp\{ x(t) \} \\
+\textrm{d}X(t) &= \mu \textrm{d}t + \sigma \textrm{d}W(t)
+\end{align*}$$
 
 ## Composed Pomp Example | A Seasonal-Poisson Model
 
@@ -305,12 +374,12 @@ N(t) &\sim \textrm{Poisson}(N(t) | \lambda(t)) \\
 
 ```{r, echo=FALSE, message=FALSE, fig.align="center", fig.width=5, fig.height=3}
 # system("cd ~/Desktop/ComposableModels && sbt \"run-main com.github.jonnylaw.examples.SimulateSeasonalPoisson\"")
-seasPoisson = read_csv("~/Desktop/ComposableModels/seasonalPoissonSims.csv", col_names = c("Time", "Observation", "Eta", "Gamma", sapply(1:7, function(i) paste0("State", i))))
+seasPoisson = read_csv("seasonalPoissonSims.csv", col_names = c("Time", "Observation", "Eta", "Gamma", sapply(1:7, function(i) paste0("State", i))))
 
-type = c("Observation", "Eta", "Gamma")
+type = c("Observation", "Eta")
 
 seasPoisson %>%
-  select(-starts_with("State")) %>%
+  select(-starts_with("State"), -Gamma) %>%
   gather(key = "key", value = "value", -Time) %>%
   mutate(key = factor(key, type)) %>%
   arrange(key) %>%
@@ -322,6 +391,11 @@ seasPoisson %>%
 ```
 
 # Programming with Streams
+
+## Functional Streams
+
+* Streams can provide a way of working with unbounded data using finite resources
+* Functional streams are modular, composable and easy to reason about
 
 ## Stream | An infinite list
 
@@ -403,9 +477,7 @@ Source.unfold(x0)(a => Some((Gaussian(a, sigma).draw, a)))
 
 * The solid line represents the simulated state, the points represent the particle cloud with the opacity representing each particles likelihood
 
-```{r animatedParticleFilter, echo=FALSE}
-knitr::read_chunk("Scripts/AnimateParticleFilter.R")
-```
+<div align="center">![AnimatedPf](Figures/animatedParticleFilter.gif)</div>
 
 ## Bayesian Inference With Streams
 
@@ -424,10 +496,6 @@ val filterStep: (Data, FilterState) => FilterState
 ```scala
 def filter(init: FilterState) = Flow[Data].scan(init)(filterStep)
 ```
-
-## Application of Bootstrap Filter
-
-
 
 ## Conclusion
 
