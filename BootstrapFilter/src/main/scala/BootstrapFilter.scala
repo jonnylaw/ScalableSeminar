@@ -27,8 +27,9 @@ object BootstrapFilter {
   /**
     * Step a generalized brownian motion state space
     */
-  def stepBrownian(mu: Double, sigma: Double)(x: State, dt: TimeIncrement): State = {
-    Gaussian(x + mu * dt, sigma * sigma * dt).draw
+  def stepBrownian(mu: Double, sigma: Double)
+    (x: State, dt: TimeIncrement): State = {
+      Gaussian(x + mu * dt, sigma * sigma * dt).draw
   }
 
   def resample(w: Seq[LogLikelihood], x: Seq[State]) = {

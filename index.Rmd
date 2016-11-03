@@ -70,13 +70,13 @@ data %>%
 
 * Given data, $y$, we want to fit a model with parameters $\theta$
   
-  * Bayes theorem allows us to do this
+* Bayes theorem allows us to do this
 
 $$p(\theta | y) = \frac{p(\theta)p(y | \theta)}{p(y)} $$
   
-  * $p(\theta | y)$ is the posterior distribution, $p(\theta)$ is the prior distribution, $p(y|\theta$) the likelihood and $p(y) = \int_\theta p(y | \theta) p(\theta) \textrm{d}\theta$
+* $p(\theta | y)$ is the posterior distribution, $p(\theta)$ is the prior distribution, $p(y|\theta$) the likelihood and $p(y) = \int_\theta p(y | \theta) p(\theta) \textrm{d}\theta$
   
-  * Once parameters have been determined, the parametric model can be used to answer questions about the process which generated the data, $y$
+* Once parameters have been determined, the parametric model can be used to answer questions about the process which generated the data, $y$
   
 ## Streaming Data
   
@@ -143,7 +143,7 @@ y(t_i)|\eta(t_i) &\sim \pi(y(t_i) | \eta(t_i)), \\
 \textbf{X}(t_i) | \textbf{x}(t_{i-1}) &\sim p(\textbf{x}(t_i) | \textbf{x}(t_{i-1}))
 \end{align*}$$
   
-  * The observation distribution $\pi(.)$ is flexible
+* The observation distribution $\pi(.)$ is flexible
 * The function $g$ permits a deterministic non-linear transformation of the state space
 * $F_t$ is a time dependent vector representing a linear transformation
 * The state space, $\textbf{x}(t)$ is a continuous time Markov process
@@ -290,13 +290,12 @@ ouSims %>%
   facet_wrap(~alpha)
 ```
 
-
 ## Example POMP Model | A Poisson Model
 
 $$\begin{align*}
 N(t) &\sim \textrm{Poisson}(N(t) | \lambda(t)) \\
 \lambda(t_i) &= \exp\{ x(t) \} \\
-\textrm{d}X(t) &= \mu \textrm{d}t + \sigma \textrm{d}W(t)
+\textrm{d}X(t) &= \mu X(t)\textrm{d}t + \sigma \textrm{d}W(t)
 \end{align*}$$
   
 ```{r poissonPlot, echo=FALSE, message=FALSE, fig.width=5, fig.height=3, fig.align="center"}
@@ -331,14 +330,14 @@ p_2(\textbf{x}^{(2)}(t_i) | \textbf{x}^{(2)}(t_{i-1}))
 
 * The class of unparameterised models and the composition operator forms a semi group
 
-## Composed POMP Example | A Seasonal Poisson Model
+## Composed POMP Example | A Seasonal-Poisson Model
 
-* First define a seasonal model, with an Ornstein-Uhlenbeck state space
+* Define a seasonal model, with an Ornstein-Uhlenbeck state space
 
 $$\begin{align*}
 y(t) &\sim \mathcal{N}(y(t) | \mu(t), \sigma) \\
 \mu(t) &= F_t^T \textbf{x}(t) \\
-\textrm{d}\textbf{X}(t) &= \alpha(\theta - \textbf{x}(t)) \textrm{d}t + \Sigma \textrm{d}W(t)
+\textrm{d}\textbf{X}(t) &= \alpha(\theta - \textbf{X}(t)) \textrm{d}t + \Sigma \textrm{d}W(t)
 \end{align*}$$
 
 * $F_t^T$ is a time dependent vector of fourier components representing seasonality:
@@ -351,16 +350,8 @@ $$F_t = \begin{pmatrix}
 \cos(3\omega t) \\
 \sin(3\omega t)
 \end{pmatrix}$$
-  
-## Composed POMP Example
-  
-* Define a Poisson model as previously:
-  
-$$\begin{align*}
-N(t) &\sim \textrm{Poisson}(N(t) | \lambda(t)) \\
-\lambda(t_i) &= \exp\{ x(t) \} \\
-\textrm{d}X(t) &= \mu \textrm{d}t + \sigma \textrm{d}W(t)
-\end{align*}$$
+
+* The Poisson model is as previously
   
 ## Composed Pomp Example | A Seasonal-Poisson Model
   
@@ -392,11 +383,6 @@ seasPoisson %>%
 ```
 
 # Programming with Streams
-
-## Functional Streams
-
-* Streams can provide a way of working with unbounded data using finite resources
-* Functional streams are modular, composable and easy to reason about
 
 ## Stream | An infinite list
 
@@ -468,7 +454,8 @@ Source.unfold(x0)(a => Some((Gaussian(a, sigma).draw, a)))
 
 ## Bayesian Inference with Streams | The Bootstrap Particle Filter
 
-* In general, POMP models require simulation based filtering (such as the bootstrap filter [@Gordon1993] below) to determine the behaviour of the latent state. Assume we have a simple Gaussian Model
+* In general, POMP models require simulation based filtering (such as the bootstrap filter [@Gordon1993]) to determine the behaviour of the latent state. 
+*Let's describe a bootstrap filter for this Gaussian model:
 
 $$\begin{align*}
 y(t_i) &\sim \mathcal{N}(y(t_i) | x(t_i), V) \\
@@ -487,8 +474,9 @@ val (x, w) = (Gaussian(0.0, 1.0).sample(n), Seq.fill(n)(1/n))
 * Advance the particles to the time of the next observation, using the state transition model $x^{(i)}(t_k) \sim p(x^{(i)}(t_k) | x^{(i)}(t_{k-1}))$
 
 ```scala
-val stepState(mu: Double, sigma: Double): (State, TimeIncrement) => State = (x, dt) {
-  Gaussian(x + mu * dt, sigma * sigma * dt).draw
+def stepState(mu: Double, sigma: Double)
+  (x: State, dt: TimeIncrement): State = {
+    Gaussian(x + mu * dt, sigma * sigma * dt).draw
 }
 val x1 = x map (stepState(_, dt))
 ```
@@ -519,7 +507,7 @@ def resample(w: Seq[LogLikelihood], x: Seq[State]) = {
 
 ```scala
 case class Data(time: Datetime, observation: Double)
-case class FilterState(t0: Datetime, state: List[State])
+case class FilterState(t0: Datetime, state: Seq[State])
 
 def stepFilter(v: Double)(s: FilterState, d: Data): FilterState = {
   val dt = d.time - s.t0
@@ -537,7 +525,8 @@ def stepFilter(v: Double)(s: FilterState, d: Data): FilterState = {
 * The the filter can by ran using an akka `Flow` and the `scan` operation, the initial state `init` contains the particle cloud and the time at the start of the application of the filter
 
 ```scala
-def filter(v: Double, init: FilterState) = Flow[Data].scan(init)(stepFilter(v))
+def filter(v: Double, init: FilterState) = 
+  Flow[Data].scan(init)(stepFilter(v))
 
 dataStream.
   via(filter(v, init)).
@@ -548,23 +537,23 @@ dataStream.
 
 ## Bayesian Inference With Streams | Parallel Particle Filters
 
-* Parameter estimates are required to run the particle filter
+* In order to account for the uncertainty of the parameter estimates, we can sample from the parameter posterior $p(\theta | y(t_{1:N}))$ and run multiple particle filters
 
-* In order to account for the uncertainty of the parameter estimates, we can sample from the parameter posterior $p(\theta | y(1:T))$ and run multiple particle filters
-
-* Running multiple particle filters (in parallel) is trivial:
+* Running multiple particle filters (in parallel) is trivial, assume `variance` is the posterior distribution of the variance:
 
 ```scala
-val variance: Rand[Double] = // Posterior distribution for the observation variance, v
-
 Source(variance.sample(4).toList).
+### <b>
   mapAsync(2){ v =>
+### </b>
     Source(sims).
       take(100).
       via(filter(v, init)).
       runWith(Sink.ignore)
   }
 ```
+
+* The full implementation of this can be found in the associated github repo [git.io/scalable](https://git.io/scalable)
 
 ## Illustration of Bootstrap Particle Filter
 
@@ -585,9 +574,13 @@ Source(variance.sample(4).toList).
 ## Conclusion
 
 * Bayesian Inference for irregularly observed time series
-* Functional Streams help, by handling unbounded data in memory
+    + Improves accuracy of inference
+    + Reduces computational cost
+    + Regularly observed data is simply a special case
 
-* I have wrote a Scala library which implements composable POMP models and inference methods
+**Further Reading**
+
+* There is a Scala library which implements composable POMP models and inference methods
 * Look at the code: [git.io/statespace](https://git.io/statespace)
 * Read the paper: [arXiv:1609.00635](https://arxiv.org/abs/1609.00635)
 
