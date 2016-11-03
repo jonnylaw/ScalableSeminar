@@ -3,15 +3,15 @@ title: "Scalable Bayesian Inference for Streaming Data"
 author: "Jonathan Law"
 date: "2 November 2016"
 autosize: true
+bibliography: bibliography.bib
 output: 
   ioslides_presentation:
     logo: Figures/NewcastleLogo.svg
     css: my_presentation.css
 ---
   
-  ```{r setup, include=FALSE}
-packages <- c("dplyr", "tidyr", "ggplot2", "gridExtra", "magrittr", "shiny",
-              "scales", "ggfortify", "leaflet", "readr")
+```{r setup, include=FALSE}
+packages <- c("dplyr", "tidyr", "ggplot2", "gridExtra", "magrittr", "scales", "ggfortify", "leaflet", "readr")
 newPackages <- packages[!(packages %in% as.character(installed.packages()[,"Package"]))]
 if(length(newPackages)) install.packages(newPackages)
 lapply(packages,require,character.only=T)
@@ -299,7 +299,7 @@ N(t) &\sim \textrm{Poisson}(N(t) | \lambda(t)) \\
 \textrm{d}X(t) &= \mu \textrm{d}t + \sigma \textrm{d}W(t)
 \end{align*}$$
   
-  ```{r poissonPlot, echo=FALSE, message=FALSE, fig.width=5, fig.height=3, fig.align="center"}
+```{r poissonPlot, echo=FALSE, message=FALSE, fig.width=5, fig.height=3, fig.align="center"}
 ## system("cd ~/Desktop/ComposableModels && sbt \"run-main com.github.jonnylaw.examples.SimulatePoisson\"")
 poisson = read_csv("PoissonSims.csv", col_names = c("Time", "Observation", "Eta", "Gamma", "State"))
 
@@ -312,6 +312,7 @@ poisson %>%
   arrange(key) %>%
   ggplot(aes(x = Time, y = value, colour = key)) + 
   geom_line() +
+  theme(legend.position="none") +
   facet_wrap(~key, ncol = 1, scales = "free_y") +
   ggtitle("Poisson simulation")
 ```
@@ -321,14 +322,14 @@ poisson %>%
 * Define an associative binary composition operator for models
 * The Left-hand observation model and linking function, $g$ are chosen
 * The Linear transformation vectors are concatenated: $F^{(3)}_t = \begin{bmatrix} F^{(1)}_t \\ F^{(2)}_t \end{bmatrix}$
-  * The latent state of each model advances according to its state evolution equation:
-  
-  $$ \textbf{X}(t_i) | \textbf{x}(t_{i-1}) \sim \begin{pmatrix} 
+* The latent state of each model advances according to its state evolution equation:
+
+$$ \textbf{X}(t_i) | \textbf{x}(t_{i-1}) \sim \begin{pmatrix} 
 p_1(\textbf{x}^{(1)}(t_i) | \textbf{x}^{(1)}(t_{i-1})) \\
 p_2(\textbf{x}^{(2)}(t_i) | \textbf{x}^{(2)}(t_{i-1}))
 \end{pmatrix} $$
-  
-  * The class of unparameterised models and the composition operator forms a semi group
+
+* The class of unparameterised models and the composition operator forms a semi group
 
 ## Composed POMP Example | A Seasonal Poisson Model
 
@@ -339,10 +340,10 @@ y(t) &\sim \mathcal{N}(y(t) | \mu(t), \sigma) \\
 \mu(t) &= F_t^T \textbf{x}(t) \\
 \textrm{d}\textbf{X}(t) &= \alpha(\theta - \textbf{x}(t)) \textrm{d}t + \Sigma \textrm{d}W(t)
 \end{align*}$$
-  
-  * $F_t^T$ is a time dependent vector of fourier components representing seasonality:
-  
-  $$F_t = \begin{pmatrix}
+
+* $F_t^T$ is a time dependent vector of fourier components representing seasonality:
+
+$$F_t = \begin{pmatrix}
 \cos(\omega t) \\
 \sin(\omega t) \\
 \cos(2\omega t) \\
@@ -457,6 +458,8 @@ $$p(x(t_n) | x(t_{n-1}), \dots x(t_0)) = p(x(t_n) | x(t_{n-1}))$$
   
 * In order to simulate the Markov Process, we can use the dual of `fold`, `unfold`, to simulate a random walk:
 
+$$x(t) = x(t-1) + w(t), \quad w(t) \sim \mathcal{N}(0, W)$$
+
 ```scala
 val x0 = Gaussian(0.0, 1.0).draw
 
@@ -465,43 +468,127 @@ Source.unfold(x0)(a => Some((Gaussian(a, sigma).draw, a)))
 
 ## Bayesian Inference with Streams | The Bootstrap Particle Filter
 
-* In general, POMP models require simulation based filtering (such as the bootstrap filter below) to determine the behaviour of the latent state:
+* In general, POMP models require simulation based filtering (such as the bootstrap filter [@Gordon1993] below) to determine the behaviour of the latent state. Assume we have a simple Gaussian Model
+
+$$\begin{align*}
+y(t_i) &\sim \mathcal{N}(y(t_i) | x(t_i), V) \\
+dX(t_i) &= \mu X(t) \textrm{d}t + \sigma \textrm{d}W(t)
+\end{align*}$$
+
+* Initialize: Sample $N$ particles from the state prior distribution, $x^{(i)}(t_0) \sim p(x(t_0))$, set the weights to $1/N$, $w^{(i)}(t_0) = 1/N$:
+
+```scala
+val n = 1000 // number of particles
+val (x, w) = (Gaussian(0.0, 1.0).sample(n), Seq.fill(n)(1/n))
+```
+
+## Bayesian Inference with Streams | The Bootstrap Particle Filter
+
+* Advance the particles to the time of the next observation, using the state transition model $x^{(i)}(t_k) \sim p(x^{(i)}(t_k) | x^{(i)}(t_{k-1}))$
+
+```scala
+val stepState(mu: Double, sigma: Double): (State, TimeIncrement) => State = (x, dt) {
+  Gaussian(x + mu * dt, sigma * sigma * dt).draw
+}
+val x1 = x map (stepState(_, dt))
+```
+
+* Calculate the likelihood (weight) of each particle, given the observation at time $t_k$, $w^{(i)}(t_k) = p(y(t_k) | x(t_k))$
+
+```scala
+val weights = x1 map (Gaussian(_, v).pdf(observation))
+```
+
+## Bayesian Inference with Streams | The Bootstrap Particle Filter
+
+* Resample the particles according to the weights, ie. select particle $j$ with probability $w^{(j)}(t_k)$
+
+```scala
+def resample(w: Seq[LogLikelihood], x: Seq[State]) = {
+  Multinomial(w).sample(x.size) map (i => x(i))
+}
+```
+
+* Store the approximate sample from the filtering distribution, $\hat{p}(x(t_k) | y(t_k))$
+
+* Advance to the time of the next observation, and repeat without the intialization step
+
+## Bayesian Inference with Streams | The Bootstrap Particle Filter
+
+* Here's the full implementation of a single step of the bootstrap particle filter for the simple Gaussian model
+
+```scala
+case class Data(time: Datetime, observation: Double)
+case class FilterState(t0: Datetime, state: List[State])
+
+def stepFilter(v: Double)(s: FilterState, d: Data): FilterState = {
+  val dt = d.time - s.t0
+  val state = s.state map (x => stepState(x, dt))
+  val w = state map (x => Gaussian(x, v).logPdf(d.observation))
+
+  FilterState(d.time, resample(w, state))
+}
+```
+
+## Bayesian Inference With Streams | The Bootstrap Particle Filter
   
-  1. Assume we have a collection of weighted "particles" representing the latent state at time $t_{k-1}$ $\{x^{(i)}(t_{k-1}), w^{(i)}(t_{k-1}), i = 1,\dots, N\}$
-  2. Advance the particles to the time of the next observation, using the state transition model $x^{(i)}(t) = p(x^{(i)}(t_k) | x^{(i)}(t_{k-1}))$
-  3. Calculate the likelihood (weight) of each particle, given the observation at time $t_k$, $w^{(i)}(t_k) = p(y(t_k) | x(t_k))$
-  4. Resample the particles according to the weights, ie. select particle $j$ with probability $w^{(j)}(t_k)$
-  5. Add the resampled state to the state vector $x(t_{1:k}) = (x(t_{1:k-1}), x(t_{k}))$, set $i = i + 1$ and go to 2
+* In order to perform the bootstrap particle filter, we need to know the time of the previous observation and the previous particle cloud
+
+* The the filter can by ran using an akka `Flow` and the `scan` operation, the initial state `init` contains the particle cloud and the time at the start of the application of the filter
+
+```scala
+def filter(v: Double, init: FilterState) = Flow[Data].scan(init)(stepFilter(v))
+
+dataStream.
+  via(filter(v, init)).
+  runWith(Sink.foreach(println))
+```
+
+* The particle filter will be applied to the data stream one element at a time, a `Source` and print the result to the console as each datapoint is processed
+
+## Bayesian Inference With Streams | Parallel Particle Filters
+
+* Parameter estimates are required to run the particle filter
+
+* In order to account for the uncertainty of the parameter estimates, we can sample from the parameter posterior $p(\theta | y(1:T))$ and run multiple particle filters
+
+* Running multiple particle filters (in parallel) is trivial:
+
+```scala
+val variance: Rand[Double] = // Posterior distribution for the observation variance, v
+
+Source(variance.sample(4).toList).
+  mapAsync(2){ v =>
+    Source(sims).
+      take(100).
+      via(filter(v, init)).
+      runWith(Sink.ignore)
+  }
+```
 
 ## Illustration of Bootstrap Particle Filter
 
 * The solid line represents the simulated state, the points represent the particle cloud with the opacity representing each particles likelihood
 
 <div align="center">![AnimatedPf](Figures/animatedParticleFilter.gif)</div>
-  
-## Bayesian Inference With Streams
-  
-* In order to perform the bootstrap particle filter, we need to know the time of the previous observation and the previous particle cloud
 
-* First define the observation datatype and the state of the bootstrap particle filter
-```scala
-case class Data(time: Datetime, observation: Double)
-case class FilterState(t0: Datetime, state: List[State])
-```
-* The signature of the filtering step function is: 
-  ```scala
-val filterStep: (Data, FilterState) => FilterState
-```
-* The the filter can by ran using an akka `Flow` and the `scan` operation, the initial state `init` contains the particle cloud and the time at the start of the application of the filter
-```scala
-def filter(init: FilterState) = Flow[Data].scan(init)(filterStep)
-```
+## Parameter Inference for POMP models
 
+* **Offline Parameter Inference**:
+    + MCMC algorithms: Particle Marginal Metropolis Hastings [@Andrieu2009]
+
+* **Online Parameter Inference**:
+    + Liu and West [@liu2001combined]
+    + Storvik Filter [@Storvik2002]
+    + Particle Learning [@Carvalho2010]
+  
 ## Conclusion
 
-* Bayesian Inference for irregular time series
+* Bayesian Inference for irregularly observed time series
 * Functional Streams help, by handling unbounded data in memory
 
-* I have wrote a scala library which implements composable POMP models and inference methods
+* I have wrote a Scala library which implements composable POMP models and inference methods
 * Look at the code: [git.io/statespace](https://git.io/statespace)
 * Read the paper: [arXiv:1609.00635](https://arxiv.org/abs/1609.00635)
+
+## References

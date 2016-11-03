@@ -1,0 +1,17 @@
+# Hidden Folders
+.Rhistory
+.ensime_cache/*
+src/main/resources/*
+
+# scala stuff
+target/*
+project/*
+.ensime
+
+# emacs backup files
+.#*
+\#*
+*~
+
+# Data Files
+*.csv
