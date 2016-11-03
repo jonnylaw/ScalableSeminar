@@ -26,11 +26,11 @@ theme_set(theme_minimal())
 
 ## Urban Observatory Air Quality Data
 
-```{r map, echo=FALSE}
+```{r map, echo=FALSE, message=FALSE}
 ## Get the sensor locations
 # query = paste0(readLines("Scripts/GetSensorLocations.SQL"), collapse = " ")
 # locations = tbl(my_db, sql(query)) %>% collect()
-write.csv(locations, file = "locations.csv", row.names = FALSE)
+# write.csv(locations, file = "locations.csv", row.names = FALSE)
 
 locations = read_csv("locations.csv")
 
@@ -45,16 +45,16 @@ renderLeaflet({
 
 ## Urban Observatory Readings
 
-```{r ts_plot, cache=TRUE, echo=FALSE}
+```{r ts_plot, cache=TRUE, echo=FALSE, message=FALSE}
 # Set parameters for data
 readings = c("Temperature", "NO2", "CO", "NO", "Humidity")
 name = "new_new_emote_1102"
 startDate = Sys.Date() - 2
 endDate = Sys.Date()
 
-tbl(my_db, sql("SELECT * FROM sensor_data_formatted")) %>%
-  filter(sensor_name == name & timestamp >= startDate & timestamp <= endDate & reading %in% readings) %>%
-  write.csv("sensor_data.csv", row.names = FALSE)
+# tbl(my_db, sql("SELECT * FROM sensor_data_formatted")) %>%
+  # filter(sensor_name == name & timestamp >= startDate & timestamp <= endDate & reading %in% readings) %>%
+  # write.csv("sensor_data.csv", row.names = FALSE)
 
 data = read_csv("sensor_data.csv")
 
