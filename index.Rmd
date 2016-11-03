@@ -414,7 +414,7 @@ scala> val naturalNumbers = Stream.from(1)
 
 * Akka streams have three main abstractions:
   
-  * A `Source` is a definition of a stream, it can be a "pure" stream, or a database or webservice call
+* A `Source` is a definition of a stream, it can be a "pure" stream, or a database or webservice call
 
 * A `Flow` is a processing stage, which can be used to transform a `Source` to another `Source`
 
@@ -441,7 +441,7 @@ foldLeft(0)(_ + _)
 
 * `scanLeft` can be used to accumulate a running sum:
   
-  ```scala
+```scala
 scala> Stream.from(1).
 take(10).
 scanLeft(0)(_ + _).
@@ -455,9 +455,9 @@ foreach(n => print(s"$n, "))
 
 $$p(x(t_n) | x(t_{n-1}), \dots x(t_0)) = p(x(t_n) | x(t_{n-1}))$$
   
-  * In order to simulate the Markov Process, we can use the dual of `fold`, `unfold`, to simulate a random walk:
-  
-  ```scala
+* In order to simulate the Markov Process, we can use the dual of `fold`, `unfold`, to simulate a random walk:
+
+```scala
 val x0 = Gaussian(0.0, 1.0).draw
 
 Source.unfold(x0)(a => Some((Gaussian(a, sigma).draw, a)))
