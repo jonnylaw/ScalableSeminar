@@ -19,17 +19,31 @@ lapply(packages,require,character.only=T)
 theme_set(theme_minimal())
 
 ## Connect to the urban observatory database
-# my_db = src_postgres(dbname = "uodata_2", host = "uodata1", port = "5432", user = "uo_select")
+my_db = src_postgres(dbname = "uodata_2", host = "uodata1", port = "5432", user = "uo_select")
 ```
+
+## Streaming Data
+
+* There are many sources of streaming data
+    + Streaming video: Netflix, YouTube, Amazon Video etc
+    + Social Media: Twitter, Facebook etc
+    + Connected Devices, the internet of things
+    
+* Streaming data is large, typically hetergeneous and typically correlated in time
+
+* Online analysis of this data is required to understand this data
 
 ## Urban Observatory Air Quality Data
 
-```{r map, echo=FALSE, message=FALSE, fig.align='center'}
-## Get the sensor locations
-# query = paste0(readLines("Scripts/GetSensorLocations.SQL"), collapse = " ")
-# locations = tbl(my_db, sql(query)) %>% collect()
-# write.csv(locations, file = "locations.csv", row.names = FALSE)
+```{r, eval=FALSE, echo=FALSE}
+# Get the sensor locations
+query = paste0(readLines("Scripts/GetSensorLocations.SQL"), collapse = " ")
+locations = tbl(my_db, sql(query)) %>% collect()
+write.csv(locations, file = "locations.csv", row.names = FALSE)
+```
 
+
+```{r map, echo=FALSE, message=FALSE, fig.align='center'}
 locations = read_csv("locations.csv")
 
 ## Output a leaflet map of sensor locations
@@ -37,6 +51,34 @@ locations = read_csv("locations.csv")
 leaflet(locations %>% filter(latitude != 0.0)) %>%
   addTiles() %>%
   addMarkers(~longitude, ~latitude, popup = ~ paste(name, reading, sep = "\n"))
+```
+
+<div class="notes">
+* Total Air Quality Sensors:
+* Total Readings from sensor 03/11/2015: 316,142
+</div>
+
+## Urban Observatory Readings
+
+```{r, eval=FALSE, echo=FALSE}
+totalReadingsByTheme = tbl(my_db, sql("SELECT theme, COUNT(*) AS total_readings, COUNT(DISTINCT sensor_name) AS total_sensors, date_trunc('week', timestamp) AS date FROM sensor_data_formatted GROUP BY theme, date_trunc('week', timestamp)"))
+
+totalReadingsByTheme %>%
+  write.csv(file = "readings_by_theme.csv", row.names = FALSE)
+```
+
+```{r, echo=FALSE, message=FALSE, fig.align='center'}
+totalReadingsByTheme = read_csv("readings_by_theme.csv")
+
+p1 = totalReadingsByTheme %>%
+  ggplot(aes(x = date, y = total_readings)) + 
+  geom_line() + facet_wrap(~theme)
+
+p2 = totalReadingsByTheme %>%
+  ggplot(aes(x = date, y = total_sensors)) +
+  geom_line() + facet_wrap(~theme)
+
+grid.arrange(p1, p2)
 ```
 
 ## Urban Observatory Readings
@@ -84,11 +126,7 @@ $$p(\theta | y) = \frac{p(\theta)p(y | \theta)}{p(y)} $$
 
 $$ Y(t_{0:N}) = \{y(t_0), y(t_1), \dots , y(t_N) \} $$
 
-* Typically streaming data is unbounded:
-
-$$y(t_0), y(t_1), \dots $$
-
-* We want to forecast future observations, which have not yet been observed
+* We want to forecast future observations: $y(t_k), k > N$
 
 * We do this by fitting a parametric model which describes the process
 
@@ -195,6 +233,8 @@ shinyApp(
 )
 ```
 
+$$\textrm{d}X(t) = \mu X(t) \textrm{d}t + \sigma \textrm{d}W(t)$$
+
 ```{r, echo=FALSE, fig.align='center'}
 brownian_sims = function(mu, sigma) {
   x = numeric(100)
@@ -262,6 +302,8 @@ shinyApp(
 )
 ```
 
+$$\textrm{d}X(t) = \alpha (\theta - X(t)) \textrm{d}t + \sigma \textrm{d}W(t)$$
+
 ```{r OU sims, echo=FALSE, fig.align="center"}
 ou_sims = function(theta, alpha, sigma) {
   x = numeric(100)
@@ -289,6 +331,7 @@ ouSims %>%
   ggtitle("Ornstein-Uhlenbeck Process Simulation with Varying Values of Alpha") + 
   facet_wrap(~alpha)
 ```
+
 
 ## Example POMP Model | A Poisson Model
 
