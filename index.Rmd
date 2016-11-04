@@ -19,7 +19,7 @@ lapply(packages,require,character.only=T)
 theme_set(theme_minimal())
 
 ## Connect to the urban observatory database
-my_db = src_postgres(dbname = "uodata_2", host = "uodata1", port = "5432", user = "uo_select")
+## my_db = src_postgres(dbname = "uodata_2", host = "uodata1", port = "5432", user = "uo_select")
 ```
 
 ## Streaming Data
@@ -54,32 +54,28 @@ leaflet(locations %>% filter(latitude != 0.0)) %>%
 ```
 
 <div class="notes">
-* Total Air Quality Sensors:
-* Total Readings from sensor 03/11/2015: 316,142
+* Total Air Quality Sensors: 
+* Total Readings from Air Quality sensor 03/11/2016: 316,142
+* Total Readings 03/11/2016: 984708
 </div>
 
-## Urban Observatory Readings
+<!-- ## Urban Observatory Readings -->
 
-```{r, eval=FALSE, echo=FALSE}
-totalReadingsByTheme = tbl(my_db, sql("SELECT theme, COUNT(*) AS total_readings, COUNT(DISTINCT sensor_name) AS total_sensors, date_trunc('week', timestamp) AS date FROM sensor_data_formatted GROUP BY theme, date_trunc('week', timestamp)"))
+<!-- ```{r, eval=FALSE, echo=FALSE} -->
+<!-- totalReadingsByTheme = tbl(my_db, sql("SELECT theme, COUNT(*) AS total_readings, date_trunc('month', timestamp) AS date FROM sensor_data_formatted GROUP BY theme, date_trunc('month', timestamp)")) -->
 
-totalReadingsByTheme %>%
-  write.csv(file = "readings_by_theme.csv", row.names = FALSE)
-```
+<!-- totalReadingsByTheme %>% -->
+<!--   write.csv(file = "readings_by_month.csv", row.names = FALSE) -->
+<!-- ``` -->
 
-```{r, echo=FALSE, message=FALSE, fig.align='center'}
-totalReadingsByTheme = read_csv("readings_by_theme.csv")
+<!-- ```{r, echo=FALSE, message=FALSE, fig.align='center', eval=FALSE} -->
+<!-- totalReadingsByTheme = read_csv("readings_by_day.csv") -->
 
-p1 = totalReadingsByTheme %>%
-  ggplot(aes(x = date, y = total_readings)) + 
-  geom_line() + facet_wrap(~theme)
-
-p2 = totalReadingsByTheme %>%
-  ggplot(aes(x = date, y = total_sensors)) +
-  geom_line() + facet_wrap(~theme)
-
-grid.arrange(p1, p2)
-```
+<!-- totalReadingsByTheme %>% -->
+<!--   filter(theme != "NA") %>% -->
+<!--   ggplot(aes(x = date, y = total)) +  -->
+<!--   geom_line() + facet_wrap(~theme) -->
+<!-- ``` -->
 
 ## Urban Observatory Readings
 
@@ -100,7 +96,7 @@ data = read_csv("sensor_data.csv")
 data %>%
   collect() %>%
   mutate(numeric_value = as.numeric(value)) %>%
-  ggplot(aes(x = timestamp, y = numeric_value, colour = reading)) +
+  ggplot(aes(x = timestamp, y = numeric_value, linetype = reading)) +
   geom_line() +
   ggtitle(paste0(paste0(readings, collapse = ", "), " readings at\n sensor ", name)) +
   ylab("reading") +
@@ -332,7 +328,6 @@ ouSims %>%
   facet_wrap(~alpha)
 ```
 
-
 ## Example POMP Model | A Poisson Model
 
 $$\begin{align*}
@@ -352,7 +347,7 @@ poisson %>%
   gather(key = "key", value = "value", -Time) %>%
   mutate(key = factor(key, levels = type)) %>%
   arrange(key) %>%
-  ggplot(aes(x = Time, y = value, colour = key)) + 
+  ggplot(aes(x = Time, y = value, linetype = key)) + 
   geom_line() +
   theme(legend.position="none") +
   facet_wrap(~key, ncol = 1, scales = "free_y") +
@@ -373,7 +368,46 @@ p_2(\textbf{x}^{(2)}(t_i) | \textbf{x}^{(2)}(t_{i-1}))
 
 * The class of unparameterised models and the composition operator forms a semi group
 
-## Composed POMP Example | A Seasonal-Poisson Model
+## Composed POMP Example | A Seasonal-Time To Event Model
+
+* Closely related to the Poisson Model, is the Log-Gaussian Cox-Process
+
+* Consider an inhomogeneous Poisson process, with rate $\lambda(t)$, then the total number of events in $(0,T]$ is:
+
+$$N(t) \sim \textrm{Poisson}\left (\int_0^T \lambda(t) \textrm{d}s \right )$$
+
+* Denote $\Lambda(t) = \int_0^t \lambda(s) \textrm{d}s$ and calculate the probability of observing at least one event:
+
+$$\begin{align*}
+P(N(t) > 0) &= 1 - p(N(t) = 0) \\
+&= 1 - \frac{\Lambda(t)^0 e^{-\Lambda(t)}}{0!} \\
+& = 1 - \exp \left \{ -\Lambda(t) \right \}
+\end{align*}$$
+
+* This is equivalent to the CDF of the LGCP, the PDF is given by:
+
+$$f(t) = \frac{\textrm{d}}{\textrm{d}t}F(t) = \lambda(t) \exp \left \{-\Lambda(t) \right \}$$
+## Composed POMP Example | A Seasonal-Time to Event Model
+
+* The LGCP model, with a generalised brownian motion state space is then:
+
+$$\begin{align*}
+p(t|\lambda(t)) &= \lambda(t) \exp \left \{-\Lambda(t) \right \} \\
+\begin{pmatrix}
+\lambda(t) \\
+\textrm{d}\Lambda(t)
+\end{pmatrix} &=\begin{pmatrix}
+\exp \{x(t)\} \\
+\lambda(t)\textrm{d}t
+\end{pmatrix}\\
+\textrm{d}X(t) &= \mu X(t)) \textrm{d}t + \sigma \textrm{d}W(t)
+\end{align*}$$
+
+* We can model irregularly observed events, such as the lightbulb series
+
+* Using past data, we can estimate the parameters of a suitable model for the lighbulb process and predict the next time the light will turn on
+
+## Composed POMP Example | A Seasonal-Time To Event Model
 
 * Define a seasonal model, with an Ornstein-Uhlenbeck state space
 
@@ -393,36 +427,38 @@ $$F_t = \begin{pmatrix}
 \cos(3\omega t) \\
 \sin(3\omega t)
 \end{pmatrix}$$
-
-* The Poisson model is as previously
   
-## Composed Pomp Example | A Seasonal-Poisson Model
+## Composed Pomp Example | A Seasonal-Time To Event Model
   
 $$\begin{align*}
-N(t) &\sim \textrm{Poisson}(N(t) | \lambda(t)) \\
-\lambda(t_i) &= \exp\{ F_t^T x(t) \} \\
+t &\sim \pi(t | \lambda(t), \Lambda(t)) \\
+\begin{pmatrix}\lambda(t_i) \\
+\Lambda(t_i)
+\end{pmatrix} &= \begin{pmatrix} \exp\{ F_t^T x(t) \} \\
+\lambda(t_i) \textrm{d}t
+\end{pmatrix}\\
 \textbf{X}(t_i)|\textbf{x}(t_{i-1}) &\sim \begin{pmatrix}
 p_1(\textbf{x}^{(1)}(t_i) | \textbf{x}^{(1)}(t_{i-1})) \\
 p_2(\textbf{x}^{(2)}(t_i) | \textbf{x}^{(2)}(t_{i-1}))
 \end{pmatrix}
 \end{align*}$$
   
-```{r, echo=FALSE, message=FALSE, fig.align="center", fig.width=5, fig.height=3}
-# system("cd ~/Desktop/ComposableModels && sbt \"run-main com.github.jonnylaw.examples.SimulateSeasonalPoisson\"")
-seasPoisson = read_csv("seasonalPoissonSims.csv", col_names = c("Time", "Observation", "Eta", "Gamma", sapply(1:7, function(i) paste0("State", i))))
+```{r, echo=FALSE, message=FALSE, eval=FALSE, fig.align="center", fig.width=5, fig.height=3}
+lgcp_seasonal = read_csv("seasonal_timetoevent.csv", col_names = c("Time", "Observation", "Eta", "Gamma", sapply(1:7, function(i) paste0("State", i))))
 
-type = c("Observation", "Eta")
+p1 = lgcp_seasonal %>%
+  select(Time, Eta) %>%
+  ggplot(aes(x = Time, y = Eta)) +
+  geom_line()
 
-seasPoisson %>%
-  select(-starts_with("State"), -Gamma) %>%
-  gather(key = "key", value = "value", -Time) %>%
-  mutate(key = factor(key, type)) %>%
-  arrange(key) %>%
-  ggplot(aes(x = Time, y = value, colour = key)) +
-  geom_line() +
-  theme(legend.position = "none") +
-  facet_wrap(~key, ncol = 1, scales = "free_y") +
-  ggtitle("Seasonal Poisson Simulation")
+p2 = lgcp_seasonal %>%
+  select(Time, Observation) %>%
+  filter(Observation == 1) %>%
+  ggplot(aes(x = Time, y = Observation)) + 
+  theme(axis.text.y=element_blank()) +
+  geom_point()
+
+grid.arrange(p2, p1, ncol = 1)
 ```
 
 # Programming with Streams
