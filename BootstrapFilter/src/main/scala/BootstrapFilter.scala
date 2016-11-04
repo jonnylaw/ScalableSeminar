@@ -1,6 +1,6 @@
 package filter
 
-import breeze.stats.distributions.{Gaussian, Multinomial}
+import breeze.stats.distributions.{Gaussian, Poisson, Multinomial}
 import breeze.linalg.DenseVector
 import breeze.numerics._
 
@@ -13,14 +13,14 @@ object BootstrapFilter {
   case class Data(time: Time, observation: Double, state: Double)
   case class FilterState(t0: Time, state: Seq[State])
 
-  def stepModel(d: Data, dt: TimeIncrement, v: Double, stepState: (State, TimeIncrement) => State): Data = {
+  def stepModel(d: Data, dt: TimeIncrement, stepState: (State, TimeIncrement) => State): Data = {
     val x1 = stepState(d.state, dt)
-    Data(d.time + dt, Gaussian(x1, v).draw, x1)
+    Data(d.time + dt, Poisson(exp(x1)).draw, x1)
   }
 
-  def simModel(dt: TimeIncrement, v: Double, stepState: (State, TimeIncrement) => State): Stream[Data] = {
+  def simModel(dt: TimeIncrement, stepState: (State, TimeIncrement) => State): Stream[Data] = {
     val x0 = Gaussian(0.0, 1.0).draw
-    val init = Data(0.0, x0, Gaussian(x0, v).draw)
+    val init = Data(0.0, x0, Poisson(exp(x0)).draw)
     Stream.iterate(init)(d => stepModel(d, dt, v, stepState))
   }
 
@@ -37,10 +37,10 @@ object BootstrapFilter {
   }
 
 
-  def stepFilter(stepState: (State, TimeIncrement) => State, v: Double)(s: FilterState, d: Data): FilterState = {
+  def stepFilter(stepState: (State, TimeIncrement) => State)(s: FilterState, d: Data): FilterState = {
     val dt = d.time - s.t0
     val state = s.state map (x => stepState(x, dt))
-    val w = state map (x => Gaussian(x, v).logPdf(d.observation))
+    val w = state map (x => Poisson(x).logPdf(d.observation))
 
     val max = w.max
     val w1 = w map { a => exp(a - max) }

@@ -42,7 +42,6 @@ locations = tbl(my_db, sql(query)) %>% collect()
 write.csv(locations, file = "locations.csv", row.names = FALSE)
 ```
 
-
 ```{r map, echo=FALSE, message=FALSE, fig.align='center'}
 locations = read_csv("locations.csv")
 
@@ -126,7 +125,7 @@ $$ Y(t_{0:N}) = \{y(t_0), y(t_1), \dots , y(t_N) \} $$
 
 * We do this by fitting a parametric model which describes the process
 
-## Irregularly Observed Data
+## Regularly Observed Data
 
 * Streaming data is often irregularly observed, consider first a completely observed discrete sensor for a lightbulb
 
@@ -147,13 +146,13 @@ lightbulb_data %>%
 
 * The lightbulb reports its status every five minutes, leading to $\frac{60}{5} \times 24 = 288$ observations each day
 
-## Discrete Irregularly Observed Data
+## Time to Event Data
 
-* Recording the lightbulb data irregularly can increase accuracy, and reduce storage costs
+* Recording the event time can reduce storage costs
 
-* In the regularly observed data there are 288 observations a day, in the irregular case there is one observation
+* In the regularly observed data there are 288 observations a day, in time to event, there is one observation
 
-* With irregularly observed data, we can accurately answer questions like: "at 12pm on Tuesday, how many lights were on in The Core?"
+* Storing the data this way, we can accurately answer questions such as: "at 12pm on Tuesday, how many lights were on in The Core?"
 
 ```{r, echo=FALSE, fig.width=5, fig.height=3, fig.align="center"}
 irregular_light_data = data_frame(t = c(as.POSIXct("2016-09-01"), as.POSIXct("2016-09-01 02:48:35")), y = c(TRUE, FALSE))
@@ -166,6 +165,14 @@ lightbulb_data %>%
   ylab("Lightbulb On") +
   scale_x_datetime(labels = date_format("%H:%M"))
 ```
+
+## Irregularly Observed Data
+
+* Sometimes a continuous process can be observed at discrete irregular intervals
+
+* This is typically the case the sensor data, sometimes sensors can go offline or change their sampling rate adaptively
+
+**Add example here**
 
 ## Modelling Irregularly Observed Data | POMP Models
 
@@ -387,7 +394,7 @@ P(N(t) > 0) &= 1 - p(N(t) = 0) \\
 * This is equivalent to the CDF of the LGCP, the PDF is given by:
 
 $$f(t) = \frac{\textrm{d}}{\textrm{d}t}F(t) = \lambda(t) \exp \left \{-\Lambda(t) \right \}$$
-## Composed POMP Example | A Seasonal-Time to Event Model
+## Composed POMP Example | A Seasonal Time to Event Model
 
 * The LGCP model, with a generalised brownian motion state space is then:
 
@@ -407,7 +414,7 @@ p(t|\lambda(t)) &= \lambda(t) \exp \left \{-\Lambda(t) \right \} \\
 
 * Using past data, we can estimate the parameters of a suitable model for the lighbulb process and predict the next time the light will turn on
 
-## Composed POMP Example | A Seasonal-Time To Event Model
+## Composed POMP Example | A Seasonal Time To Event Model
 
 * Define a seasonal model, with an Ornstein-Uhlenbeck state space
 
@@ -428,7 +435,7 @@ $$F_t = \begin{pmatrix}
 \sin(3\omega t)
 \end{pmatrix}$$
   
-## Composed Pomp Example | A Seasonal-Time To Event Model
+## Composed Pomp Example | A Seasonal Time To Event Model
   
 $$\begin{align*}
 t &\sim \pi(t | \lambda(t), \Lambda(t)) \\
@@ -533,11 +540,13 @@ Source.unfold(x0)(a => Some((Gaussian(a, sigma).draw, a)))
 
 ## Bayesian Inference with Streams | The Bootstrap Particle Filter
 
-* In general, POMP models require simulation based filtering (such as the bootstrap filter [@Gordon1993]) to determine the behaviour of the latent state. 
-*Let's describe a bootstrap filter for this Gaussian model:
+* In general, POMP models require simulation based filtering (such as the bootstrap filter [@Gordon1993]) to determine the behaviour of the latent state
+
+*Let's describe a bootstrap filter for this Poisson model:
 
 $$\begin{align*}
-y(t_i) &\sim \mathcal{N}(y(t_i) | x(t_i), V) \\
+y(t_i) &\sim \textrm{Poisson}(y(t_i) | x(t_i)) \\
+\lambda(t_i) &= \exp \{ x(t_i) \} \\
 dX(t_i) &= \mu X(t) \textrm{d}t + \sigma \textrm{d}W(t)
 \end{align*}$$
 
@@ -560,10 +569,10 @@ def stepState(mu: Double, sigma: Double)
 val x1 = x map (stepState(_, dt))
 ```
 
-* Calculate the likelihood (weight) of each particle, given the observation at time $t_k$, $w^{(i)}(t_k) = p(y(t_k) | x(t_k))$
+* Calculate the likelihood (weight) of each particle, given the observation at time $t_k$, $w^{(i)}(t_k) = \textrm{Poisson}(y(t_k) | x^{(i)}(t_k))$
 
 ```scala
-val weights = x1 map (Gaussian(_, v).pdf(observation))
+val weights = x1 map (x => Poisson(x).pdf(observation))
 ```
 
 ## Bayesian Inference with Streams | The Bootstrap Particle Filter
@@ -582,16 +591,16 @@ def resample(w: Seq[LogLikelihood], x: Seq[State]) = {
 
 ## Bayesian Inference with Streams | The Bootstrap Particle Filter
 
-* Here's the full implementation of a single step of the bootstrap particle filter for the simple Gaussian model
+* Here's the full implementation of a single step of the bootstrap particle filter for the simple Poisson model
 
 ```scala
 case class Data(time: Datetime, observation: Double)
 case class FilterState(t0: Datetime, state: Seq[State])
 
-def stepFilter(v: Double)(s: FilterState, d: Data): FilterState = {
+def stepFilter(s: FilterState, d: Data): FilterState = {
   val dt = d.time - s.t0
   val state = s.state map (x => stepState(x, dt))
-  val w = state map (x => Gaussian(x, v).logPdf(d.observation))
+  val w = state map (x => Poisson(x, v).logPdf(d.observation))
 
   FilterState(d.time, resample(w, state))
 }
@@ -604,11 +613,11 @@ def stepFilter(v: Double)(s: FilterState, d: Data): FilterState = {
 * The the filter can by ran using an akka `Flow` and the `scan` operation, the initial state `init` contains the particle cloud and the time at the start of the application of the filter
 
 ```scala
-def filter(v: Double, init: FilterState) = 
+def filter(init: FilterState) = 
   Flow[Data].scan(init)(stepFilter(v))
 
 dataStream.
-  via(filter(v, init)).
+  via(filter(init)).
   runWith(Sink.foreach(println))
 ```
 
@@ -659,7 +668,7 @@ Source(variance.sample(4).toList).
 
 **Further Reading**
 
-* There is a Scala library which implements composable POMP models and inference methods
+* I have written a Scala library which implements composable POMP models and inference methods
 * Look at the code: [git.io/statespace](https://git.io/statespace)
 * Read the paper: [arXiv:1609.00635](https://arxiv.org/abs/1609.00635)
 
