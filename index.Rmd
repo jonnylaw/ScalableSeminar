@@ -31,7 +31,7 @@ theme_set(theme_minimal())
     
 * Streaming data is large, typically hetergeneous and typically correlated in time
 
-* Online analysis of this data is required to understand this data
+* Analysing this data online is desirable; reducing storage and computational costs and allowing decisions to be made more quickly
 
 ## Urban Observatory Air Quality Data
 
@@ -121,6 +121,8 @@ $$p(\theta | y) = \frac{p(\theta)p(y | \theta)}{p(y)} $$
 
 $$ Y(t_{0:N}) = \{y(t_0), y(t_1), \dots , y(t_N) \} $$
 
+* The Bayesian framework is natural for streaming time series data
+
 * We want to forecast future observations: $y(t_k), k > N$
 
 * We do this by fitting a parametric model which describes the process
@@ -170,9 +172,7 @@ lightbulb_data %>%
 
 * Sometimes a continuous process can be observed at discrete irregular intervals
 
-* This is typically the case the sensor data, sometimes sensors can go offline or change their sampling rate adaptively
-
-**Add example here**
+* This is typically the case with sensor data, sometimes sensors can go offline or change their sampling rate adaptively
 
 ## Modelling Irregularly Observed Data | POMP Models
 
@@ -238,7 +238,7 @@ shinyApp(
 
 $$\textrm{d}X(t) = \mu X(t) \textrm{d}t + \sigma \textrm{d}W(t)$$
 
-```{r, echo=FALSE, fig.align='center'}
+```{r, echo=FALSE, fig.align='center', fig.width = 5, fig.height=3}
 brownian_sims = function(mu, sigma) {
   x = numeric(100)
   x[1] = rnorm(1, 0, 1)
@@ -307,7 +307,7 @@ shinyApp(
 
 $$\textrm{d}X(t) = \alpha (\theta - X(t)) \textrm{d}t + \sigma \textrm{d}W(t)$$
 
-```{r OU sims, echo=FALSE, fig.align="center"}
+```{r OU sims, echo=FALSE, fig.align="center", fig.width=5, fig.height=3}
 ou_sims = function(theta, alpha, sigma) {
   x = numeric(100)
   x[1] = rnorm(1, 0, 1)
@@ -375,13 +375,15 @@ p_2(\textbf{x}^{(2)}(t_i) | \textbf{x}^{(2)}(t_{i-1}))
 
 * The class of unparameterised models and the composition operator forms a semi group
 
-## Composed POMP Example | A Seasonal-Time To Event Model
+## Composed POMP Example | A Seasonal Time To Event Model
 
 * Closely related to the Poisson Model, is the Log-Gaussian Cox-Process
 
 * Consider an inhomogeneous Poisson process, with rate $\lambda(t)$, then the total number of events in $(0,T]$ is:
 
 $$N(t) \sim \textrm{Poisson}\left (\int_0^T \lambda(t) \textrm{d}s \right )$$
+
+## Composed POMP Example | A Seasonal Time To Event Model
 
 * Denote $\Lambda(t) = \int_0^t \lambda(s) \textrm{d}s$ and calculate the probability of observing at least one event:
 
@@ -394,6 +396,7 @@ P(N(t) > 0) &= 1 - p(N(t) = 0) \\
 * This is equivalent to the CDF of the LGCP, the PDF is given by:
 
 $$f(t) = \frac{\textrm{d}}{\textrm{d}t}F(t) = \lambda(t) \exp \left \{-\Lambda(t) \right \}$$
+
 ## Composed POMP Example | A Seasonal Time to Event Model
 
 * The LGCP model, with a generalised brownian motion state space is then:
@@ -450,7 +453,7 @@ p_2(\textbf{x}^{(2)}(t_i) | \textbf{x}^{(2)}(t_{i-1}))
 \end{pmatrix}
 \end{align*}$$
   
-```{r, echo=FALSE, message=FALSE, eval=FALSE, fig.align="center", fig.width=5, fig.height=3}
+```{r, echo=FALSE, message=FALSE, fig.align="center", fig.width=5, fig.height=3}
 lgcp_seasonal = read_csv("seasonal_timetoevent.csv", col_names = c("Time", "Observation", "Eta", "Gamma", sapply(1:7, function(i) paste0("State", i))))
 
 p1 = lgcp_seasonal %>%
@@ -495,30 +498,27 @@ scala> val naturalNumbers = Stream.from(1)
 
 ## Higher Order Functions | Operations on Streams
 
-* `foldLeft` (or `foldRight`) can be used (with a seed) to reduce a foldable data structure by recursively applying a binary operation
+* `fold` can be used (with a seed) to reduce a `Stream` by recursively applying a binary operation
 
 ```scala
 scala> Stream.from(1).
 take(10).
-foldLeft(0)(_ + _)
+fold(0)(_ + _)
 ```
 `55`
 
-* `foldLeft` will reduce from the left, `((1 + 2) + 3) + 4`
+* `fold` will reduce a stream from the left, `((1 + 2) + 3) + 4`
 
-* `foldRight` will reduce from the right, `1 + (2 + (3 + 4))`
-
-* `reduce` is equivalent to `foldLeft` for associative and commutative binary operations and can be applied in parallel
+* `reduce` is equivalent to `fold` for associative operations and does not guarantee order of operations
 
 ## Higher Order Functions | Operations on Streams
 
-* `scanLeft` can be used to accumulate a running sum:
+* `scan` can be used to accumulate a running sum:
   
 ```scala
 scala> Stream.from(1).
 take(10).
-scanLeft(0)(_ + _).
-foreach(n => print(s"$n, "))
+scan(0)(_ + _)
 ```
 `0, 1, 3, 6, 10, 15, 21, 28, 36, 45, 55`
 
@@ -542,7 +542,7 @@ Source.unfold(x0)(a => Some((Gaussian(a, sigma).draw, a)))
 
 * In general, POMP models require simulation based filtering (such as the bootstrap filter [@Gordon1993]) to determine the behaviour of the latent state
 
-*Let's describe a bootstrap filter for this Poisson model:
+* Let's describe a bootstrap filter for this Poisson model:
 
 $$\begin{align*}
 y(t_i) &\sim \textrm{Poisson}(y(t_i) | x(t_i)) \\
@@ -569,10 +569,10 @@ def stepState(mu: Double, sigma: Double)
 val x1 = x map (stepState(_, dt))
 ```
 
-* Calculate the likelihood (weight) of each particle, given the observation at time $t_k$, $w^{(i)}(t_k) = \textrm{Poisson}(y(t_k) | x^{(i)}(t_k))$
+* Calculate the likelihood (weight) of each particle, given the observation at time $t_k$, $w^{(i)}(t_k) = \textrm{Poisson}(y(t_k) | \lambda(t_k)^{(i)}(t_k))$
 
 ```scala
-val weights = x1 map (x => Poisson(x).pdf(observation))
+val weights = x1 map (x => Poisson(exp(x)).pdf(observation))
 ```
 
 ## Bayesian Inference with Streams | The Bootstrap Particle Filter
@@ -600,7 +600,7 @@ case class FilterState(t0: Datetime, state: Seq[State])
 def stepFilter(s: FilterState, d: Data): FilterState = {
   val dt = d.time - s.t0
   val state = s.state map (x => stepState(x, dt))
-  val w = state map (x => Poisson(x, v).logPdf(d.observation))
+  val w = state map (x => Poisson(exp(x), v).logPdf(d.observation))
 
   FilterState(d.time, resample(w, state))
 }
