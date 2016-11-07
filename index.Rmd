@@ -259,7 +259,6 @@ brownianSims %>%
   ggplot(aes(x = Time, y = Value)) + 
   geom_line() +
   geom_ribbon(aes(ymax = upper, ymin = lower), alpha = 0.3) +
-  ggtitle("Generalised Brownian Motion Simulation With Different Drift Values") + 
   facet_wrap(~drift, scales = "free_y")
 ```
 
@@ -331,7 +330,6 @@ ouSims %>%
   ggplot(aes(x = Time, y = Value)) + 
   geom_line() +
   geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.3) +
-  ggtitle("Ornstein-Uhlenbeck Process Simulation with Varying Values of Alpha") + 
   facet_wrap(~alpha)
 ```
 
