@@ -395,7 +395,7 @@ P(N(t) > 0) &= 1 - p(N(t) = 0) \\
 
 $$f(t) = \frac{\textrm{d}}{\textrm{d}t}F(t) = \lambda(t) \exp \left \{-\Lambda(t) \right \}$$
 
-## Composed POMP Example | A Seasonal Time to Event Model
+## Composed POMP Example | A Seasonal Time To Event Model
 
 * The LGCP model, with a generalised brownian motion state space is then:
 
@@ -408,12 +408,10 @@ p(t|\lambda(t)) &= \lambda(t) \exp \left \{-\Lambda(t) \right \} \\
 \exp \{x(t)\} \\
 \lambda(t)\textrm{d}t
 \end{pmatrix}\\
-\textrm{d}X(t) &= \mu X(t)) \textrm{d}t + \sigma \textrm{d}W(t)
+\textrm{d}X(t) &= \mu X(t) \textrm{d}t + \sigma \textrm{d}W(t)
 \end{align*}$$
 
-* We can model irregularly observed events, such as the lightbulb series
-
-* Using past data, we can estimate the parameters of a suitable model for the lighbulb process and predict the next time the light will turn on
+* We can model time to event data, such as the lightbulb series
 
 ## Composed POMP Example | A Seasonal Time To Event Model
 
@@ -436,7 +434,7 @@ $$F_t = \begin{pmatrix}
 \sin(3\omega t)
 \end{pmatrix}$$
   
-## Composed Pomp Example | A Seasonal Time To Event Model
+## Composed POMP Example | A Seasonal Time To Event Model
   
 $$\begin{align*}
 t &\sim \pi(t | \lambda(t), \Lambda(t)) \\
@@ -455,8 +453,8 @@ p_2(\textbf{x}^{(2)}(t_i) | \textbf{x}^{(2)}(t_{i-1}))
 lgcp_seasonal = read_csv("seasonal_timetoevent.csv", col_names = c("Time", "Observation", "Eta", "Gamma", sapply(1:7, function(i) paste0("State", i))))
 
 p1 = lgcp_seasonal %>%
-  select(Time, Eta) %>%
-  ggplot(aes(x = Time, y = Eta)) +
+  select(Time, Gamma) %>%
+  ggplot(aes(x = Time, y = Gamma)) +
   geom_line()
 
 p2 = lgcp_seasonal %>%
@@ -612,7 +610,7 @@ def stepFilter(s: FilterState, d: Data): FilterState = {
 
 ```scala
 def filter(init: FilterState) = 
-  Flow[Data].scan(init)(stepFilter(v))
+  Flow[Data].scan(init)(stepFilter)
 
 dataStream.
   via(filter(init)).
